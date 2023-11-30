@@ -1,0 +1,75 @@
+-- Query 4
+SELECT CUS_GENDER, COUNT(DISTINCT CUS_ID) AS TotalCustomers
+FROM customer
+WHERE CUS_ID IN (SELECT CUS_ID FROM "order" WHERE ORD_AMOUNT >= 3000)
+GROUP BY CUS_GENDER;
+
+-- Query 5
+SELECT o.ORD_ID, o.ORD_AMOUNT, o.ORD_DATE, c.CUS_ID, p.PRO_NAME
+FROM "order" o
+JOIN customer c ON o.CUS_ID = c.CUS_ID
+JOIN supplier_pricing sp ON o.PRICING_ID = sp.PRICING_ID
+JOIN product p ON sp.PRO_ID = p.PRO_ID
+WHERE c.CUS_ID = 2;
+
+-- Query 6
+SELECT s.*
+FROM supplier s
+JOIN supplier_pricing sp ON s.SUPP_ID = sp.SUPP_ID
+GROUP BY s.SUPP_ID
+HAVING COUNT(DISTINCT sp.PRO_ID) > 1;
+
+-- Query 7
+SELECT p.CAT_ID, c.CAT_NAME, p.PRO_NAME, MIN(sp.SUPP_PRICE) AS MinPrice
+FROM product p
+JOIN supplier_pricing sp ON p.PRO_ID = sp.PRO_ID
+JOIN category c ON p.CAT_ID = c.CAT_ID
+GROUP BY p.CAT_ID, c.CAT_NAME, p.PRO_NAME;
+
+-- Query 8
+SELECT PRO_ID, PRO_NAME
+FROM product
+WHERE PRO_ID IN (SELECT PRO_ID FROM "order" WHERE ORD_DATE > '2021-10-05');
+
+-- Query 9
+SELECT CUS_NAME, CUS_GENDER
+FROM customer
+WHERE CUS_NAME LIKE 'A%' OR CUS_NAME LIKE '%A';
+
+-- Query 10
+-- Assuming that you have a table named "supplier_rating" to store supplier ratings
+CREATE OR REPLACE PROCEDURE GetSupplierRating()
+AS $$
+DECLARE
+    supplier_rating_cursor CURSOR FOR
+        SELECT sp.SUPP_ID, s.SUPP_NAME, AVG(r.RAT_RATSTARS) AS AvgRating
+        FROM supplier_pricing sp
+        JOIN "order" o ON sp.PRICING_ID = o.PRICING_ID
+        JOIN rating r ON o.ORD_ID = r.ORD_ID
+        JOIN supplier s ON sp.SUPP_ID = s.SUPP_ID
+        GROUP BY sp.SUPP_ID, s.SUPP_NAME;
+        
+    supplier_id INT;
+    supplier_name VARCHAR(50);
+    average_rating DECIMAL(3, 2);
+BEGIN
+    OPEN supplier_rating_cursor;
+    LOOP
+        FETCH supplier_rating_cursor INTO supplier_id, supplier_name, average_rating;
+        EXIT WHEN NOT FOUND;
+        
+        CASE
+            WHEN average_rating = 5 THEN
+                RAISE NOTICE 'Supplier ID: %, Supplier Name: %, Rating: Excellent Service', supplier_id, supplier_name;
+            WHEN average_rating > 4 THEN
+                RAISE NOTICE 'Supplier ID: %, Supplier Name: %, Rating: Good Service', supplier_id, supplier_name;
+            WHEN average_rating > 2 THEN
+                RAISE NOTICE 'Supplier ID: %, Supplier Name: %, Rating: Average Service', supplier_id, supplier_name;
+            ELSE
+                RAISE NOTICE 'Supplier ID: %, Supplier Name: %, Rating: Poor Service', supplier_id, supplier_name;
+        END CASE;
+    END LOOP;
+    
+    CLOSE supplier_rating_cursor;
+END;
+$$ LANGUAGE plpgsql;
